@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby1.9.1
+require 'fusefs'
+require 'gitfs'
+require 'optparse'
+
+options = {git: '.'}
+parser = OptionParser.new do |opts|
+	opts.banner = "Usage: git mount [OPTION...] MOUNTPOINT"
+	opts.separator "\nOptions:"
+	opts.on("-g", "--git REPO", "Mount the git repository at REPO (default: .).") do |repo|
+		options[:git] = repo
+	end
+end
+parser.parse!
+options[:mountpoint] = parser.instance_variable_get(:@default_argv)[0]
+
+
+pid = fork do
+	trap('HUP', 'IGNORE')
+	trap('SIGTERM') do
+		FuseFS.exit
+	end
+
+	filesystem = GitFS.new(options[:git])
+	FuseFS.set_root(filesystem)
+	FuseFS.mount_under(options[:mountpoint])
+	FuseFS.run
+end
+Process.detach(pid)
